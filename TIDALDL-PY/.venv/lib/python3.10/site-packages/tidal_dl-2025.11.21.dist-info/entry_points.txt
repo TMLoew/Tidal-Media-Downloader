@@ -1,0 +1,2 @@
+[console_scripts]
+tidal-dl = tidal_dl:main

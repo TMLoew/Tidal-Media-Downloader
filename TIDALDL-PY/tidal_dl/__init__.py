@@ -12,6 +12,7 @@ import sys
 import getopt
 import aigpy
 from functools import wraps
+from datetime import datetime
 
 if __package__ in (None, "", "__main__"):
     from pathlib import Path
@@ -94,6 +95,85 @@ def _login_if_needed():
             loginByPkce()
         else:
             loginByWeb()
+
+
+
+
+def create_playlist_from_liked_tracks():
+    if not _ensure_api_key_configured(interactive=True):
+        return
+    _login_if_needed()
+
+    liked_tracks = TIDAL_API.getFavoriteTracks()
+    if not liked_tracks:
+        Printf.err("No liked tracks found.")
+        return
+
+    today = datetime.now().strftime("%d-%m-%Y")
+    title = f"Liked Songs {today}"
+    description = f"Auto-generated from liked tracks on {today}"
+    playlist = TIDAL_API.createPlaylist(title, description)
+    if not playlist or not getattr(playlist, 'uuid', None):
+        Printf.err("Failed to create playlist.")
+        return
+
+    track_ids = [str(track.id) for track in liked_tracks if getattr(track, 'id', None)]
+    TIDAL_API.addTracksToPlaylist(playlist.uuid, track_ids)
+    Printf.success(f"Created playlist '{title}' with {len(track_ids)} tracks.")
+
+def _get_liked_songs_playlists():
+    playlists = TIDAL_API.getPlaylistSelf()
+    liked_playlists = []
+    for playlist in playlists:
+        title = (playlist.title or "").strip()
+        if not title.startswith("Liked Songs "):
+            continue
+        date_str = title.replace("Liked Songs ", "", 1).strip()
+        try:
+            parsed = datetime.strptime(date_str, "%d-%m-%Y")
+        except ValueError:
+            parsed = None
+        liked_playlists.append((parsed, playlist))
+    liked_playlists.sort(key=lambda item: item[0] or datetime.min, reverse=True)
+    return liked_playlists
+
+
+def update_playlist_from_liked_tracks():
+    if not _ensure_api_key_configured(interactive=True):
+        return
+    _login_if_needed()
+
+    liked_tracks = TIDAL_API.getFavoriteTracks()
+    if not liked_tracks:
+        Printf.err("No liked tracks found.")
+        return
+
+    liked_playlists = _get_liked_songs_playlists()
+    if not liked_playlists:
+        Printf.err("No existing 'Liked Songs' playlists found.")
+        return
+
+    Printf.info("Select a playlist to update (press Enter for most recent):")
+    for idx, (_, playlist) in enumerate(liked_playlists, start=1):
+        Printf.info(f"{idx}) {playlist.title} [{playlist.uuid}]")
+
+    choice = input("").strip()
+    if choice == "":
+        target = liked_playlists[0][1]
+    else:
+        try:
+            index = int(choice) - 1
+            target = liked_playlists[index][1]
+        except Exception:
+            Printf.err("Invalid selection.")
+            return
+
+    Printf.info(f"Updating playlist '{target.title}'...")
+    TIDAL_API.clearPlaylist(target.uuid)
+
+    track_ids = [str(track.id) for track in liked_tracks if getattr(track, 'id', None)]
+    TIDAL_API.addTracksToPlaylist(target.uuid, track_ids)
+    Printf.success(f"Updated playlist '{target.title}' with {len(track_ids)} tracks.")
 
 
 def require_api_ready(*, interactive: bool, perform_login: bool = True):
@@ -263,6 +343,10 @@ def main():
             start_listener()
         elif choice == "10":
             configureCustomApiSettings()
+        elif choice == "11":
+            create_playlist_from_liked_tracks()
+        elif choice == "12":
+            update_playlist_from_liked_tracks()
         else:
             if not _ensure_api_key_configured(interactive=True):
                 continue

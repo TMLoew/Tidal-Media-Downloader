@@ -176,6 +176,11 @@ class Printf(object):
             [aigpy.cmd.green(LANG.select.CHOICE_ENTER + " '9':"), LANG.get('CHOICE_LISTENER', 'Start listener mode')],
             [aigpy.cmd.green(LANG.select.CHOICE_ENTER + " '10':"),
              LANG.get('CHOICE_CUSTOM_API_SETTINGS', 'Configure custom API settings')],
+            [aigpy.cmd.green(LANG.select.CHOICE_ENTER + " '11':"),
+             LANG.get('CHOICE_LIKED_TO_PLAYLIST', 'Create playlist from liked songs')],
+            [aigpy.cmd.green(LANG.select.CHOICE_ENTER + " '12':"),
+             LANG.get('CHOICE_UPDATE_LIKED_PLAYLIST', 'Update existing liked songs playlist')],
+
             [aigpy.cmd.green(LANG.select.CHOICE_ENTER_URLID), LANG.select.CHOICE_DOWNLOAD_BY_URL],
         ])
         tb.set_style(prettytable.PLAIN_COLUMNS)

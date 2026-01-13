@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from . import dash
 
 import requests
+from tqdm import tqdm
 
 from .model import *
 from .settings import *
@@ -106,6 +107,36 @@ class TidalAPI(object):
             raise Exception(errmsg) from last_exception
 
         raise Exception(errmsg)
+
+
+
+    def _build_auth_headers(self, extra_headers=None):
+        headers = {'authorization': f'Bearer {self.key.accessToken}'}
+        if extra_headers:
+            headers.update(extra_headers)
+        return headers
+
+    def __request_api__(self, method, path, data=None, params=None, headers=None, json_body=None, urlpre='https://api.tidalhifi.com/v1/'):
+        header = self._build_auth_headers(headers)
+        query = dict(params or {})
+        query['countryCode'] = self.key.countryCode
+        url = path if isinstance(path, str) and path.startswith('http') else urlpre + path
+        response = requests.request(method, url, headers=header, params=query, data=data, json=json_body)
+        if response.status_code >= 400:
+            try:
+                body = response.text
+            except Exception:
+                body = ''
+            raise Exception(f"{response.status_code} {response.reason}: {body}")
+        if response.text:
+            return response.json()
+        return {}
+
+    def __post_api__(self, path, data=None, params=None, headers=None, json_body=None, urlpre='https://api.tidalhifi.com/v1/'):
+        return self.__request_api__('POST', path, data=data, params=params, headers=headers, json_body=json_body, urlpre=urlpre)
+
+    def __delete_api__(self, path, params=None, headers=None, urlpre='https://api.tidalhifi.com/v1/'):
+        return self.__request_api__('DELETE', path, params=params, headers=headers, urlpre=urlpre)
 
     def __getItems__(self, path, params: Optional[dict] = None):
         query = dict(params or {})
@@ -329,12 +360,131 @@ class TidalAPI(object):
     def getPlaylist(self, id) -> Playlist:
         return aigpy.model.dictToModel(self.__get__('playlists/' + str(id)), Playlist())
     
+
+    def _get_playlist_etag(self, playlist_uuid: str):
+        url = f'https://api.tidalhifi.com/v1/playlists/{playlist_uuid}'
+        params = {'countryCode': self.key.countryCode}
+        headers = self._build_auth_headers()
+
+        try:
+            response = requests.head(url, headers=headers, params=params)
+            if response.status_code == 200 and response.headers.get('ETag'):
+                return response.headers.get('ETag')
+        except Exception:
+            pass
+
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code != 200:
+            return None
+        return response.headers.get('ETag')
+
     def getPlaylistSelf(self) -> List[Playlist]:
         ret = self.__get__(f'users/{self.key.userId}/playlists')
         playlists = []
         for item in ret['items']:
             playlists.append(aigpy.model.dictToModel(item, Playlist()))
         return playlists
+
+    def getPlaylistTrackCount(self, playlist_uuid: str) -> int:
+        playlist = self.getPlaylist(playlist_uuid)
+        return int(playlist.numberOfTracks or 0)
+
+
+    def getFavoriteTracks(self) -> List[Track]:
+        tracks = []
+        offset = 0
+        limit = 100
+        total = None
+
+        while True:
+            params = {"limit": limit, "offset": offset}
+            ret = self.__get__(f'users/{self.key.userId}/favorites/tracks', params)
+
+            if isinstance(ret, dict):
+                items = ret.get("items", [])
+                total = ret.get("totalNumberOfItems") or ret.get("total") or total
+            elif isinstance(ret, list):
+                items = ret
+            else:
+                break
+
+            if not items:
+                break
+
+            for item in items:
+                data = item.get("item") if isinstance(item, dict) and "item" in item else item
+                if isinstance(data, dict) and "id" in data:
+                    tracks.append(aigpy.model.dictToModel(data, Track()))
+
+            offset += len(items)
+
+            if total is not None and offset >= total:
+                break
+            if total is None and len(items) < limit:
+                break
+
+        return tracks
+
+    def createPlaylist(self, title: str, description: str = "") -> Playlist:
+        payload = {
+            'title': title,
+            'description': description,
+        }
+        result = self.__post_api__(f'users/{self.key.userId}/playlists', data=payload)
+        return aigpy.model.dictToModel(result, Playlist())
+
+    def addTracksToPlaylist(self, playlist_uuid: str, track_ids: List[str]) -> bool:
+        if not track_ids:
+            return True
+        chunk_size = 50
+        total = len(track_ids)
+        with tqdm(total=total, unit="track", desc="Adding tracks") as progress:
+            for idx in range(0, total, chunk_size):
+                chunk = track_ids[idx:idx + chunk_size]
+                etag = self._get_playlist_etag(playlist_uuid)
+                data = {
+                    'trackIds': ','.join(chunk),
+                    'onArtifactNotFound': 'SKIP',
+                    'onDupes': 'SKIP',
+                    'toIndex': -1,
+                }
+                params = {
+                    'limit': len(chunk),
+                }
+                headers = {'If-None-Match': etag} if etag else None
+
+                last_error = None
+                try:
+                    self.__request_api__(
+                        'POST',
+                        f'playlists/{playlist_uuid}/items',
+                        params=params,
+                        headers=headers,
+                        data=data,
+                    )
+                    last_error = None
+                except Exception as exc:
+                    last_error = exc
+
+                if last_error is not None:
+                    raise Exception(f"Failed to add tracks to playlist: {last_error}")
+
+                progress.update(len(chunk))
+        return True
+
+    def clearPlaylist(self, playlist_uuid: str, chunk_size: int = 50) -> bool:
+        remaining = self.getPlaylistTrackCount(playlist_uuid)
+        while remaining > 0:
+            etag = self._get_playlist_etag(playlist_uuid)
+            indices = range(min(remaining, chunk_size))
+            indices_str = ",".join(str(i) for i in indices)
+            headers = {'If-None-Match': etag} if etag else None
+            self.__delete_api__(
+                f'playlists/{playlist_uuid}/items/{indices_str}',
+                headers=headers,
+            )
+            remaining = self.getPlaylistTrackCount(playlist_uuid)
+        return True
 
     def getArtist(self, id) -> Artist:
         return aigpy.model.dictToModel(self.__get__('artists/' + str(id)), Artist())
