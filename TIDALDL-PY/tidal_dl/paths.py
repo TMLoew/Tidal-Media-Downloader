@@ -34,6 +34,17 @@ def __getDurationStr__(seconds):
 
 
 def __getExtension__(stream: StreamUrl):
+    if SETTINGS.audioConvertFormat:
+        fmt = SETTINGS.audioConvertFormat.lower()
+        if fmt in ("alac", "m4a", "aac"):
+            return ".m4a"
+        if fmt == "flac":
+            return ".flac"
+        if fmt == "wav":
+            return ".wav"
+        if fmt == "mp3":
+            return ".mp3"
+
     url = (stream.url or '').lower()
     codec = (stream.codec or '').lower()
 
@@ -97,7 +108,7 @@ def getPlaylistPath(playlist):
     return f"{SETTINGS.downloadPath}/{retpath}"
 
 
-def getTrackPath(track, stream, album=None, playlist=None):
+def getTrackPath(track, stream, album=None, playlist=None, base_override=None):
     base = './'
     number = str(track.trackNumber).rjust(2, '0')
     if album is not None:
@@ -108,6 +119,8 @@ def getTrackPath(track, stream, album=None, playlist=None):
     if playlist is not None and SETTINGS.usePlaylistFolder:
         base = getPlaylistPath(playlist)
         number = str(track.trackNumberOnPlaylist).rjust(2, '0')
+    if base_override is not None:
+        base = os.fspath(base_override)
 
     # artist
     artists = __fixPath__(TIDAL_API.getArtistsName(track.artists))

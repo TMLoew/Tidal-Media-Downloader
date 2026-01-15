@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 import aigpy
 import requests
-from mutagen import MutagenError
+from mutagen import MutagenError, File as MutagenFile
 from mutagen.flac import FLAC
 
 from .coverfix import ensure_flac_cover_art
@@ -45,14 +45,54 @@ _PYAV_AVAILABLE: Optional[bool] = None
 _ALBUM_COVER_CACHE: Dict[str, bytes] = {}
 
 
-def __isSkip__(finalpath: str, url: str) -> bool:
+def _quality_rank(value: str) -> int:
+    ranking = {
+        "LOW": 0,
+        "HIGH": 1,
+        "LOSSLESS": 2,
+        "HI_RES": 3,
+        "HI_RES_LOSSLESS": 4,
+    }
+    return ranking.get((value or "").upper(), -1)
+
+
+def _local_stream_quality(path: str) -> str:
+    try:
+        audio = MutagenFile(path)
+    except MutagenError:
+        return ""
+    if audio is None or not getattr(audio, "tags", None):
+        return ""
+    tags = {str(k).upper(): v for k, v in audio.tags.items()}
+    stream_quality = tags.get("TIDAL_STREAM_SOUND_QUALITY")
+    if stream_quality and stream_quality[0]:
+        return str(stream_quality[0]).strip()
+    audio_quality = tags.get("TIDAL_AUDIO_QUALITY")
+    if audio_quality and audio_quality[0]:
+        return str(audio_quality[0]).strip()
+    return ""
+
+
+def __isSkip__(finalpath: str, url: str, stream: Optional[StreamUrl] = None) -> bool:
     if not SETTINGS.checkExist:
         return False
     curSize = aigpy.file.getSize(finalpath)
     if curSize <= 0:
         return False
-    netSize = aigpy.net.getSize(url)
-    return curSize >= netSize
+    if not SETTINGS.audioConvertFormat:
+        netSize = aigpy.net.getSize(url)
+        if curSize < netSize:
+            return False
+    if stream is None:
+        return True
+    local_quality = _local_stream_quality(finalpath)
+    if not local_quality:
+        return True
+    local_rank = _quality_rank(local_quality)
+    stream_rank = _quality_rank(str(getattr(stream, "soundQuality", "")))
+    if local_rank < 0 or stream_rank < 0:
+        return True
+    return local_rank >= stream_rank
 
 
 def _replace_file(src: str, dest: str) -> None:
@@ -201,6 +241,32 @@ def _remux_flac_stream(src_path: str, dest_path: str) -> Tuple[str, Optional[str
     if last_reason:
         logging.debug("Unable to remux FLAC stream using available backends: %s", last_reason)
     return src_path, last_reason
+
+
+def _convert_audio(src_path: str, dest_path: str, fmt: str) -> Tuple[bool, str]:
+    fmt = (fmt or "").lower()
+    if not fmt:
+        return True, ""
+    cmd = ["ffmpeg", "-y", "-i", src_path]
+    if fmt in ("alac", "m4a", "aac"):
+        cmd += ["-c:a", "alac"]
+    elif fmt == "flac":
+        cmd += ["-c:a", "flac"]
+    elif fmt == "wav":
+        cmd += ["-c:a", "pcm_s16le"]
+    elif fmt == "mp3":
+        cmd += ["-c:a", "libmp3lame", "-q:a", "2"]
+    else:
+        return False, f"Unsupported convert format: {fmt}"
+    cmd.append(dest_path)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        return False, "ffmpeg not found in PATH"
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "ffmpeg conversion failed"
+        return False, err
+    return True, ""
 
 
 def __parseContributors__(roleType: str, contributors: Optional[dict]) -> Optional[list[str]]:
@@ -601,10 +667,11 @@ def downloadTrack(
     playlist: Optional[Playlist] = None,
     userProgress: Any = None,
     partSize: int = 1048576,
+    base_override: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[StreamUrl]]:
     try:
         stream = TIDAL_API.getStreamUrl(track.id, SETTINGS.audioQuality)
-        path = getTrackPath(track, stream, album, playlist)
+        path = getTrackPath(track, stream, album, playlist, base_override=base_override)
         base_path, expected_extension = os.path.splitext(path)
         expected_extension = expected_extension.lower()
         download_extension = _guess_stream_extension(stream)
@@ -627,7 +694,7 @@ def downloadTrack(
             userProgress.updateStream(stream)
 
         # check exist
-        if __isSkip__(path, stream.url):
+        if __isSkip__(path, stream.url, stream):
             Printf.success(aigpy.path.getFileName(path) + " (skip:already exists!)")
             return True, '', stream
 
@@ -674,6 +741,16 @@ def downloadTrack(
                 _replace_file(processed_path, final_tmp_path)
                 processed_path = final_tmp_path
 
+            convert_format = (SETTINGS.audioConvertFormat or "").strip().lower()
+            if convert_format:
+                target_ext = os.path.splitext(path)[1].lower()
+                converted_path = os.path.join(tmpdir, f"converted{target_ext}")
+                ok, err = _convert_audio(processed_path, converted_path, convert_format)
+                if not ok:
+                    Printf.err(f"Audio convert failed for '{track.title}': {err}")
+                    return False, err, stream
+                processed_path = converted_path
+
             _replace_file(processed_path, path)
 
         # contributors
@@ -704,6 +781,8 @@ def downloadTracks(
     tracks: Iterable[Track],
     album: Optional[Album] = None,
     playlist: Optional[Playlist] = None,
+    start_index: int = 1,
+    collect_errors: bool = False,
 ) -> None:
     def __getAlbum__(item: Track):
         album = TIDAL_API.getAlbum(item.album.id)
@@ -711,22 +790,55 @@ def downloadTracks(
             downloadCover(album)
         return album
 
+    errors = []
+    start_index = max(1, int(start_index))
+
     if not SETTINGS.multiThread:
         for index, item in enumerate(tracks):
+            if (index + 1) < start_index:
+                continue
             itemAlbum = album
             if itemAlbum is None:
-                itemAlbum = __getAlbum__(item)
-                item.trackNumberOnPlaylist = index + 1
-            downloadTrack(item, itemAlbum, playlist)
+                try:
+                    itemAlbum = __getAlbum__(item)
+                    item.trackNumberOnPlaylist = index + 1
+                except Exception as exc:
+                    if collect_errors:
+                        errors.append((index + 1, item.title, str(exc)))
+                    Printf.err(f"Skip track '{item.title}' due to album error: {exc}")
+                    continue
+            ok, err, _ = downloadTrack(item, itemAlbum, playlist)
+            if collect_errors and not ok:
+                errors.append((index + 1, item.title, err))
     else:
         thread_pool = ThreadPoolExecutor(max_workers=5)
+        futures = []
         for index, item in enumerate(tracks):
+            if (index + 1) < start_index:
+                continue
             itemAlbum = album
             if itemAlbum is None:
-                itemAlbum = __getAlbum__(item)
-                item.trackNumberOnPlaylist = index + 1
-            thread_pool.submit(downloadTrack, item, itemAlbum, playlist)
+                try:
+                    itemAlbum = __getAlbum__(item)
+                    item.trackNumberOnPlaylist = index + 1
+                except Exception as exc:
+                    if collect_errors:
+                        errors.append((index + 1, item.title, str(exc)))
+                    Printf.err(f"Skip track '{item.title}' due to album error: {exc}")
+                    continue
+            futures.append((index + 1, item, thread_pool.submit(downloadTrack, item, itemAlbum, playlist)))
+        if collect_errors:
+            for idx, item, future in futures:
+                ok, err, _ = future.result()
+                if not ok:
+                    errors.append((idx, item.title, err))
         thread_pool.shutdown(wait=True)
+
+    if collect_errors and errors:
+        Printf.info("Download errors summary:")
+        for idx, title, err in errors:
+            Printf.err(f"[{idx}] {title}: {err}")
+    return errors
 
 
 def downloadVideos(

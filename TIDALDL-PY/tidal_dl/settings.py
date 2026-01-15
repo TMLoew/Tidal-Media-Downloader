@@ -42,6 +42,9 @@ class Settings(aigpy.model.ModelBase):
     customPkceRedirectUri = None
     customPkceScope = None
     metadataRefreshDelay = False
+    downloadStartIndex = 1
+    likedTracksPath = ""
+    audioConvertFormat = ""
 
     downloadPath = "./download/"
     audioQuality = AudioQuality.Normal
@@ -49,7 +52,7 @@ class Settings(aigpy.model.ModelBase):
     usePlaylistFolder = True
     albumFolderFormat = R"{ArtistName}/{Flag} {AlbumTitle} [{AlbumID}] [{AlbumYear}]"
     playlistFolderFormat = R"Playlist/{PlaylistName} [{PlaylistUUID}]"
-    trackFileFormat = R"{TrackNumber} - {ArtistName} - {TrackTitle}{ExplicitFlag}"
+    trackFileFormat = R"{TrackTitle} - {ArtistName}{ExplicitFlag}"
     videoFileFormat = R"{VideoNumber} - {ArtistName} - {VideoTitle}{ExplicitFlag}"
 
     def getDefaultPathFormat(self, type: Type):
@@ -58,7 +61,7 @@ class Settings(aigpy.model.ModelBase):
         elif type == Type.Playlist:
             return R"Playlist/{PlaylistName} [{PlaylistUUID}]"
         elif type == Type.Track:
-            return R"{TrackNumber} - {ArtistName} - {TrackTitle}{ExplicitFlag}"
+            return R"{TrackTitle} - {ArtistName}{ExplicitFlag}"
         elif type == Type.Video:
             return R"{VideoNumber} - {ArtistName} - {VideoTitle}{ExplicitFlag}"
         return ""
@@ -90,6 +93,8 @@ class Settings(aigpy.model.ModelBase):
             self.albumFolderFormat = self.getDefaultPathFormat(Type.Album)
         if self.trackFileFormat is None:
             self.trackFileFormat = self.getDefaultPathFormat(Type.Track)
+        if self.trackFileFormat == R"{TrackNumber} - {ArtistName} - {TrackTitle}{ExplicitFlag}":
+            self.trackFileFormat = self.getDefaultPathFormat(Type.Track)
         if self.playlistFolderFormat is None:
             self.playlistFolderFormat = self.getDefaultPathFormat(Type.Playlist)
         if self.videoFileFormat is None:
@@ -105,6 +110,20 @@ class Settings(aigpy.model.ModelBase):
             self.listenerPort = 8123
         if self.listenerPort <= 0 or self.listenerPort > 65535:
             self.listenerPort = 8123
+
+        try:
+            self.downloadStartIndex = int(self.downloadStartIndex)
+        except (TypeError, ValueError):
+            self.downloadStartIndex = 1
+        if self.downloadStartIndex < 1:
+            self.downloadStartIndex = 1
+
+        if self.likedTracksPath is None:
+            self.likedTracksPath = ""
+        if self.audioConvertFormat is None:
+            self.audioConvertFormat = ""
+        if isinstance(self.audioConvertFormat, str):
+            self.audioConvertFormat = self.audioConvertFormat.strip().lower()
 
         if isinstance(self.customSupportsPkce, str):
             if self.customSupportsPkce.lower() == 'true':

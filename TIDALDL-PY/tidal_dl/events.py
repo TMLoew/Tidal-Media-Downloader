@@ -291,7 +291,16 @@ def start_artist(obj: Artist):
 def start_playlist(obj: Playlist):
     Printf.playlist(obj)
     tracks, videos = TIDAL_API.getItems(obj.uuid, Type.Playlist)
-    downloadTracks(tracks, None, obj)
+    start_index = SETTINGS.downloadStartIndex or 1
+    if start_index <= 1:
+        try:
+            prompt = "Start from track # (1-based, press Enter for beginning):"
+            raw = Printf.enter(prompt).strip()
+            if raw:
+                start_index = int(raw)
+        except Exception:
+            start_index = 1
+    downloadTracks(tracks, None, obj, start_index=start_index, collect_errors=True)
     if SETTINGS.downloadVideos:
         downloadVideos(videos, None, obj)
 
@@ -372,6 +381,16 @@ def changePathSettings():
         LANG.select.MSG_PATH_ERR,
         '0',
         SETTINGS.downloadPath)
+    liked_path = Printf.enter(
+        LANG.get(
+            'CHANGE_LIKED_TRACKS_PATH',
+            "Liked tracks path (blank for default, '0' keep current):",
+        )
+    )
+    if liked_path == "":
+        SETTINGS.likedTracksPath = ""
+    elif liked_path != '0':
+        SETTINGS.likedTracksPath = liked_path
     SETTINGS.albumFolderFormat = Printf.enterFormat(
         LANG.select.CHANGE_ALBUM_FOLDER_FORMAT,
         SETTINGS.albumFolderFormat,
@@ -424,6 +443,16 @@ def changeSettings():
             "Use metadata refresh delay('0'-No,'1'-Yes):",
         )
     )
+    convert_value = Printf.enter(
+        LANG.get(
+            'CHANGE_AUDIO_CONVERT_FORMAT',
+            "Audio convert format (alac/flac/wav/mp3/aac, blank for none, '0' keep):",
+        )
+    )
+    if convert_value == "":
+        SETTINGS.audioConvertFormat = ""
+    elif convert_value != '0':
+        SETTINGS.audioConvertFormat = convert_value.strip().lower()
 
     SETTINGS.listenerEnabled = Printf.enterBool(
         LANG.get('CHANGE_ENABLE_LISTENER', "Enable listener mode('0'-No,'1'-Yes):")

@@ -10,6 +10,7 @@
 '''
 import base64
 import hashlib
+import logging
 import random
 import secrets
 import time
@@ -23,6 +24,7 @@ from tqdm import tqdm
 
 from .model import *
 from .settings import *
+from .printf import Printf
 
 # SSL Warnings | retry number
 requests.packages.urllib3.disable_warnings()
@@ -116,12 +118,51 @@ class TidalAPI(object):
             headers.update(extra_headers)
         return headers
 
-    def __request_api__(self, method, path, data=None, params=None, headers=None, json_body=None, urlpre='https://api.tidalhifi.com/v1/'):
+    def _refresh_access_token(self) -> bool:
+        refresh_token = self.key.refreshToken or TOKEN.refreshToken
+        if not refresh_token:
+            return False
+        if not self.refreshAccessToken(refresh_token):
+            return False
+        TOKEN.userid = self.key.userId
+        TOKEN.countryCode = self.key.countryCode
+        TOKEN.accessToken = self.key.accessToken
+        TOKEN.refreshToken = self.key.refreshToken
+        if getattr(self.key, "expiresIn", None):
+            TOKEN.expiresAfter = time.time() + int(self.key.expiresIn)
+        TOKEN.save()
+        return True
+
+    def __request_api__(
+        self,
+        method,
+        path,
+        data=None,
+        params=None,
+        headers=None,
+        json_body=None,
+        urlpre='https://api.tidalhifi.com/v1/',
+        retry_on_auth_error: bool = True,
+    ):
         header = self._build_auth_headers(headers)
         query = dict(params or {})
         query['countryCode'] = self.key.countryCode
         url = path if isinstance(path, str) and path.startswith('http') else urlpre + path
         response = requests.request(method, url, headers=header, params=query, data=data, json=json_body)
+        if response.status_code == 401 and retry_on_auth_error:
+            logging.info("Access token expired; refreshing now.")
+            Printf.info("Access token expired; refreshing now.")
+            if self._refresh_access_token():
+                return self.__request_api__(
+                    method,
+                    path,
+                    data=data,
+                    params=params,
+                    headers=headers,
+                    json_body=json_body,
+                    urlpre=urlpre,
+                    retry_on_auth_error=False,
+                )
         if response.status_code >= 400:
             try:
                 body = response.text

@@ -1,48 +1,55 @@
 <br>
-This is a personal fork. Some features I don't use may not work. Feel free to use it, but I’m not accepting feature requests.
+This is a personal fork focused on playlist automation and reliability for large libraries. It includes liked-songs playlist creation/update, resumable playlist downloads, and safer output handling. Some upstream features may be untested here.
 
 
 <br>
-    <a href="https://github.com/yaronzz/Tidal-Media-Downloader-PRO">[GUI-REPOSITORY]</a>
+    <a href="https://github.com/yaronzz/Tidal-Media-Downloader-PRO">[GUI-REPOSITORY (Upstream)]</a>
 <br>
 
-![Tidal-Media-Downloader](https://socialify.git.ci/yaronzz/Tidal-Media-Downloader/image?description=1&font=Rokkitt&forks=1&issues=1&language=1&name=1&owner=1&pattern=Circuit%20Board&stargazers=1&theme=Dark)
+![Tidal-Media-Downloader](https://socialify.git.ci/TMLoew/Tidal-Media-Downloader/image?description=1&font=Rokkitt&forks=1&issues=1&language=1&name=1&owner=1&pattern=Circuit%20Board&stargazers=1&theme=Dark)
 
 
 <div align="center">
   <h1>Tidal-Media-Downloader</h1>
-  <a href="https://github.com/yaronzz/Tidal-Media-Downloader/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/yaronzz/Tidal-Media-Downloader.svg?style=flat-square" alt="">
+  <a href="https://github.com/TMLoew/Tidal-Media-Downloader/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/TMLoew/Tidal-Media-Downloader.svg?style=flat-square" alt="">
   </a>
-  <a href="https://github.com/devicelocksmith/Tidal-Media-Downloader/releases">
-    <img src="https://img.shields.io/github/v/release/devicelocksmith/Tidal-Media-Downloader.svg?style=flat-square" alt="">
+  <a href="https://github.com/TMLoew/Tidal-Media-Downloader/releases">
+    <img src="https://img.shields.io/github/v/release/TMLoew/Tidal-Media-Downloader.svg?style=flat-square" alt="">
   </a>
   <a href="https://www.python.org/">
-    <img src="https://img.shields.io/github/issues/yaronzz/Tidal-Media-Downloader.svg?style=flat-square" alt="">
+    <img src="https://img.shields.io/github/issues/TMLoew/Tidal-Media-Downloader.svg?style=flat-square" alt="">
   </a>
-  <a href="https://github.com/devicelocksmith/Tidal-Media-Downloader/releases">
-    <img src="https://img.shields.io/github/downloads/devicelocksmith/Tidal-Media-Downloader/total?label=tidal-gui%20download" alt="">
+  <a href="https://github.com/TMLoew/Tidal-Media-Downloader/releases">
+    <img src="https://img.shields.io/github/downloads/TMLoew/Tidal-Media-Downloader/total?label=tidal-gui%20download" alt="">
   </a>
   <a href="https://pypi.org/project/tidal-dl/">
     <img src="https://img.shields.io/pypi/dm/tidal-dl?label=tidal-dl%20download" alt="">
   </a>
-  <a href="https://github.com/devicelocksmith/Tidal-Media-Downloader/actions/workflows/build.yml">
-    <img src="https://github.com/devicelocksmith/Tidal-Media-Downloader/actions/workflows/build.yml/badge.svg" alt="">
+  <a href="https://github.com/TMLoew/Tidal-Media-Downloader/actions/workflows/build.yml">
+    <img src="https://github.com/TMLoew/Tidal-Media-Downloader/actions/workflows/build.yml/badge.svg" alt="">
   </a>
 </div>
 <p align="center">
-  «Tidal-Media-Downloader» is an application that lets you download videos and tracks from Tidal. It supports two version: tidal-dl and tidal-gui. (This repository only contains tidal-dl, and the release isn't the newest gui version.)
+  «Tidal-Media-Downloader» is an application that lets you download videos and tracks from Tidal. It supports two version: tidal-dl and tidal-gui. (This fork only contains tidal-dl; GUI notes and docs are upstream.)
     <br>
-        <a href="https://github.com/devicelocksmith/Tidal-Media-Downloader/releases">Download</a> |
-        <a href="https://doc.yaronzz.com/post/tidal_dl_installation/">Documentation</a> |
-        <a href="https://doc.yaronzz.com/post/tidal_dl_installation_chn/">中文文档</a> |
+        <a href="https://github.com/TMLoew/Tidal-Media-Downloader/releases">Download</a> |
+        <a href="https://doc.yaronzz.com/post/tidal_dl_installation/">Documentation (Upstream)</a> |
+        <a href="https://doc.yaronzz.com/post/tidal_dl_installation_chn/">中文文档 (Upstream)</a> |
     <br>
 </p>
 
 ## 📺 Installation 
 
 ```shell
-pip3 install tidal-dl --upgrade
+pip3 install "git+https://github.com/TMLoew/Tidal-Media-Downloader.git"
+```
+
+If you want to install local changes from this repo:
+
+```shell
+pip3 install -r requirements.txt --user
+python3 setup.py install
 ```
 
 | USE                                                   | FUNCTION                   |
@@ -52,15 +59,15 @@ pip3 install tidal-dl --upgrade
 | tidal-dl -l "https://tidal.com/browse/track/70973230" | Download link              |
 | tidal-dl -g                                           | Show simple-gui            |
 
-If you are using windows system, you can use [tidal-pro](https://github.com/yaronzz/Tidal-Media-Downloader-PRO)
+If you are using windows system, you can use [tidal-pro (Upstream)](https://github.com/yaronzz/Tidal-Media-Downloader-PRO)
 
 ### Nightly Builds
 
 |Download nightly builds from continuous integration: 	| [![Build Status][Build]][Actions] 
 |-------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
 
-[Actions]: https://github.com/devicelocksmith/Tidal-Media-Downloader/actions
-[Build]: https://github.com/devicelocksmith/Tidal-Media-Downloader/workflows/Tidal%20Media%20Downloader/badge.svg
+[Actions]: https://github.com/TMLoew/Tidal-Media-Downloader/actions
+[Build]: https://github.com/TMLoew/Tidal-Media-Downloader/workflows/Tidal%20Media%20Downloader/badge.svg
 
 ## 🤖 Features
 - Download album \ track \ video \ playlist \ artist-albums
@@ -72,6 +79,20 @@ If you are using windows system, you can use [tidal-pro](https://github.com/yaro
 - PKCE login flow support for secure keyless authentication
 
 - Optional listener mode for remote-triggered downloads secured by a shared secret
+
+### Fork additions
+- Create a **Liked Songs** playlist from your TIDAL favorites (dated `DD-MM-YYYY`)
+- Update an existing **Liked Songs** playlist (select most recent or pick from list)
+- Offline **Liked Tracks** sync (download missing, move unliked to `_Removed`)
+- Enforced filename format: `Title - Artist.ext` (with collision-safe renames)
+- Quality-aware re-downloads (replace lower quality with highest available)
+- Per-file quality cache to avoid re-scanning unchanged files
+- Flatten liked-tracks folder so all files live in one directory
+- Configurable liked-tracks path (defaults to `~/Music/TIDAL/Liked Tracks`)
+- Auto-refresh access token on expiry (transparent retry)
+- Optional auto-conversion after download (e.g., ALAC/FLAC/WAV/MP3)
+- `--startat` CLI flag to resume playlist downloads at a specific track index
+- Playlist downloads skip errors and print a summary at the end
 
 ## 🔐 Using PKCE credentials
 
@@ -158,16 +179,16 @@ Log output is appended to `~/tidal-dl-listener.txt` so you can audit activity in
 | {VideoYear}       | 2021                                       |
 | {TrackID}         | 188932980                                  |
 
-## ☕ Support
+## ☕ Support (Original Author)
 
-If you really like my projects and want to support me, you can buy me a coffee and star this project. 
+If you really like the original project and want to support its author, you can buy them a coffee and star their repository.
 
 <a href="https://www.buymeacoffee.com/yaronzz" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/arial-orange.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
 
 ## 🎂 Contributors
 This project exists thanks to all the people who contribute. 
 
-<a href="https://github.com/devicelocksmith/Tidal-Media-Downloader/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=devicelocksmith/Tidal-Media-Downloader" /></a>
+<a href="https://github.com/TMLoew/Tidal-Media-Downloader/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=TMLoew/Tidal-Media-Downloader" /></a>
 
 ## 🎨 Libraries and reference
 

@@ -77,6 +77,7 @@ class Printf(object):
             ["-l or --link",        "url/id/filePath"],
             ["-q or --quality",     "track quality('Normal','High,'HiFi','Master')"],
             ["-r or --resolution",  "video resolution('P1080', 'P720', 'P480', 'P360')"],
+            ["-s or --startat",     "start at playlist track index (1-based)"],
             ["--listen",            "start HTTP listener mode"],
             ["--refresh-metadata", "refresh FLAC metadata in a directory"]
         ])
@@ -93,6 +94,7 @@ class Printf(object):
     @staticmethod
     def settings():
         data = SETTINGS
+        from .paths import getProfilePath
         api_key_info = apiKey.getItem(data.apiKeyIndex)
         using_custom_api = data.has_custom_api_settings()
         api_key_formats = ''
@@ -125,6 +127,8 @@ class Printf(object):
             [LANG.select.SETTING_PLAYLIST_FOLDER_FORMAT, data.playlistFolderFormat],
             [LANG.select.SETTING_TRACK_FILE_FORMAT, data.trackFileFormat],
             [LANG.select.SETTING_VIDEO_FILE_FORMAT, data.videoFileFormat],
+            [LANG.get('SETTING_AUDIO_CONVERT_FORMAT', 'Audio convert format'),
+             data.audioConvertFormat or "(none)"],
 
             #settings - quality
             [LANG.select.SETTING_AUDIO_QUALITY, data.audioQuality],
@@ -154,6 +158,8 @@ class Printf(object):
             [LANG.select.SETTING_DOWNLOAD_DELAY, data.downloadDelay],
             [LANG.get('SETTING_METADATA_REFRESH_DELAY', 'Use metadata refresh delay'),
              data.metadataRefreshDelay],
+            [LANG.get('SETTING_LIKED_TRACKS_PATH', 'Liked tracks path'),
+             data.likedTracksPath or "(default: ~/Music/TIDAL/Liked Tracks)"],
             [LANG.get('SETTING_LISTENER_ENABLED', 'Listener mode enabled'), data.listenerEnabled],
             [LANG.get('SETTING_LISTENER_PORT', 'Listener port'), data.listenerPort],
             [LANG.get('SETTING_LISTENER_SECRET', 'Listener secret'), Printf._mask_listener_secret(data.listenerSecret)],
@@ -180,6 +186,8 @@ class Printf(object):
              LANG.get('CHOICE_LIKED_TO_PLAYLIST', 'Create playlist from liked songs')],
             [aigpy.cmd.green(LANG.select.CHOICE_ENTER + " '12':"),
              LANG.get('CHOICE_UPDATE_LIKED_PLAYLIST', 'Update existing liked songs playlist')],
+            [aigpy.cmd.green(LANG.select.CHOICE_ENTER + " '13':"),
+             LANG.get('CHOICE_SYNC_LIKED_OFFLINE', 'Sync offline liked tracks')],
 
             [aigpy.cmd.green(LANG.select.CHOICE_ENTER_URLID), LANG.select.CHOICE_DOWNLOAD_BY_URL],
         ])
